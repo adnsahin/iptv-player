@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>IPTV Player</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+#app{display:flex;flex-direction:column;height:100%}
+header{background:#161b22;padding:10px 12px;border-bottom:1px solid #30363d;flex-shrink:0}
+header h1{font-size:16px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+header h1 span{color:#58a6ff}
+.inputrow{display:flex;gap:6px}
+.inputrow input[type=text]{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:14px;outline:none}
+.inputrow input[type=text]:focus{border-color:#58a6ff}
+.btn{background:#238636;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:active{opacity:.7}
+.btn.gray{background:#21262d;border:1px solid #30363d}
+#status{font-size:12px;color:#8b949e;margin-top:6px}
+#playerwrap{display:none;background:#000;position:relative;flex-shrink:0}
+#playerwrap video{width:100%;aspect-ratio:16/9;background:#000;display:block;max-height:45vh}
+#nowplaying{display:none;background:#161b22;padding:6px 12px;font-size:13px;border-bottom:1px solid #30363d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+#nowplaying b{color:#58a6ff}
+#toolbar{display:flex;gap:6px;padding:8px 12px;align-items:center;flex-shrink:0}
+#search{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;font-size:13px;outline:none}
+#chcount{font-size:12px;color:#8b949e;white-space:nowrap}
+#chlist{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 0 40px}
+.chgroup{font-size:12px;color:#8b949e;padding:10px 14px 4px;background:#0d1117;position:sticky;top:0;text-transform:uppercase;letter-spacing:.5px}
+.ch{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid #21262d}
+.ch:active,.ch.playing{background:#1f2937}
+.ch img{width:36px;height:36px;border-radius:4px;object-fit:contain;background:#21262d;flex-shrink:0}
+.ch .ph{width:36px;height:36px;border-radius:4px;background:#21262d;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.ch .info{min-width:0}
+.ch .nm{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch .grp{font-size:11px;color:#8b949e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#empty{text-align:center;padding:60px 20px;color:#8b949e}
+#empty .ic{font-size:48px;margin-bottom:12px}
+#empty p{font-size:13px;line-height:1.6}
+footer{position:fixed;bottom:0;left:0;right:0;background:#161b22;border-top:1px solid #30363d;padding:8px 12px;display:flex;gap:8px;justify-content:center;z-index:10}
+footer a{color:#58a6ff;font-size:12px;text-decoration:none}
+@media(min-width:768px){#playerwrap video{max-height:50vh}}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+<h1>📺 <span>IPTV</span> Player</h1>
+<div class="inputrow">
+<input type="text" id="m3uurl" placeholder="M3U playlist URL'si..." autocomplete="off">
+<button class="btn" id="loadbtn">Yükle</button>
+</div>
+<div class="inputrow" style="margin-top:6px">
+<button class="btn gray" id="filebtn" style="flex:1">📁 M3U Dosyası Seç</button>
+<input type="file" id="fileinput" accept=".m3u,.m3u8,text/plain" style="display:none">
+</div>
+<div id="status">Playlist yükleyin veya dosya seçin</div>
+</header>
+<div id="playerwrap">
+<video id="video" controls playsinline webkit-playsinline></video>
+</div>
+<div id="nowplaying"></div>
+<div id="toolbar">
+<input type="text" id="search" placeholder="🔍 Kanal ara...">
+<span id="chcount"></span>
+</div>
+<div id="chlist">
+<div id="empty">
+<div class="ic">📡</div>
+<p>Henüz kanal yok.<br>M3U playlist URL'si yapıştırıp <b>Yükle</b>'ye basın<br>veya cihazınızdan .m3u dosyası seçin.</p>
+</div>
+</div>
+</div>
+<footer>
+<span style="font-size:11px;color:#8b949e">iOS 10+ uyumlu • Ana ekrana ekleyebilirsiniz</span>
+</footer>
+
+<script>
+(function(){
+var channels=[];
+var currentIdx=-1;
+var video=document.getElementById('video');
+var playerwrap=document.getElementById('playerwrap');
+var nowplaying=document.getElementById('nowplaying');
+var chlist=document.getElementById('chlist');
+var statusEl=document.getElementById('status');
+var searchEl=document.getElementById('search');
+var chcount=document.getElementById('chcount');
+var m3uurl=document.getElementById('m3uurl');
+
+// son URL'yi hatırla
+try{var saved=localStorage.getItem('iptv_m3u_url');if(saved)m3uurl.value=saved;}catch(e){}
+
+function setStatus(t){statusEl.textContent=t;}
+
+document.getElementById('loadbtn').onclick=function(){
+var url=m3uurl.value.replace(/^\s+|\s+$/g,'');
+if(!url){setStatus('URL boş olamaz');return;}
+setStatus('Yükleniyor...');
+try{localStorage.setItem('iptv_m3u_url',url);}catch(e){}
+fetch(url,{mode:'cors'})
+.then(function(r){if(!r.ok)throw new Error(r.status);return r.text();})
+.then(function(t){parseM3U(t);setStatus(channels.length+' kanal yüklendi');})
+.catch(function(e){
+setStatus('CORS/ Ağ hatası: '+e.message+' — dosyayı cihazdan seçin veya farklı bir URL deneyin');
+});
+};
+
+document.getElementById('filebtn').onclick=function(){document.getElementById('fileinput').click();};
+document.getElementById('fileinput').onchange=function(e){
+var f=e.target.files[0];if(!f)return;
+setStatus('Dosya okunuyor...');
+var r=new FileReader();
+r.onload=function(){parseM3U(r.result);setStatus(channels.length+' kanal yüklendi (dosya)');};
+r.readAsText(f);
+};
+
+function parseM3U(text){
+channels=[];
+currentIdx=-1;
+var lines=text.split(/\r?\n/);
+var pending=null;
+for(var i=0;i<lines.length;i++){
+var line=lines[i].replace(/^\s+|\s+$/g,'');
+if(!line)continue;
+if(line.indexOf('#EXTINF')===0){
+var name='',logo='',group='';
+var cm=line.match(/tvg-logo="([^"]*)"/i);
+if(cm)logo=cm[1];
+cm=line.match(/group-title="([^"]*)"/i);
+if(cm)group=cm[1];
+var dp=line.lastIndexOf(',');
+if(dp>-1)name=line.substring(dp+1).replace(/^\s+|\s+$/g,'');
+pending={name:name||'Kanal',logo:logo,group:group||'Diğer',url:''};
+}else if(line.indexOf('#')===0){
+// yorum satırı, atla
+}else if(pending){
+pending.url=line;
+channels.push(pending);
+pending=null;
+}
+}
+renderList('');
+}
+
+function renderList(q){
+chlist.innerHTML='';
+chcount.textContent=channels.length?channels.length+' kanal':'';
+if(!channels.length){
+chcount.textContent='';
+chlist.innerHTML='<div id="empty"><div class="ic">📡</div><p>Henüz kanal yok.<br>M3U playlist URL\'si yapıştırıp <b>Yükle</b>\'ye basın<br>veya cihazınızdan .m3u dosyası seçin.</p></div>';
+return;
+}
+q=(q||'').toLowerCase();
+var groups={};
+var order=[];
+for(var i=0;i<channels.length;i++){
+var c=channels[i];
+if(q&&(c.name.toLowerCase().indexOf(q)===-1&&c.group.toLowerCase().indexOf(q)===-1))continue;
+if(!groups[c.group]){groups[c.group]=[];order.push(c.group);}
+groups[c.group].push({ch:c,idx:i});
+}
+for(var g=0;g<order.length;g++){
+var gname=order[g];
+var hd=document.createElement('div');
+hd.className='chgroup';
+hd.textContent=gname+' ('+groups[gname].length+')';
+chlist.appendChild(hd);
+var arr=groups[gname];
+for(var j=0;j<arr.length;j++){
+(function(item){
+var el=document.createElement('div');
+el.className='ch';
+if(item.idx===currentIdx)el.className+=' playing';
+var imgHtml;
+if(item.ch.logo){
+imgHtml='<img src="'+esc(item.ch.logo)+'" onerror="this.style.display=\'none\'">';
+}else{
+imgHtml='<div class="ph">📺</div>';
+}
+el.innerHTML=imgHtml+'<div class="info"><div class="nm">'+esc(item.ch.name)+'</div><div class="grp">'+esc(item.ch.group)+'</div></div>';
+el.onclick=function(){playChannel(item.idx);};
+chlist.appendChild(el);
+})(arr[j]);
+}
+}
+}
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function playChannel(idx){
+if(idx<0||idx>=channels.length)return;
+currentIdx=idx;
+var c=channels[idx];
+playerwrap.style.display='block';
+nowplaying.style.display='block';
+nowplaying.innerHTML='Şu an oynatılıyor: <b>'+esc(c.name)+'</b> — '+esc(c.group);
+video.src=c.url;
+video.load();
+var p=video.play();
+if(p&&p.catch)p.catch(function(){});
+// listeyi işaretle
+var els=chlist.getElementsByClassName('ch');
+for(var i=0;i<els.length;i++)els[i].classList.remove('playing');
+renderList(searchEl.value); // yeniden render ile işaretle
+}
+
+video.addEventListener('error',function(){
+if(currentIdx>=0&&channels[currentIdx]){
+nowplaying.innerHTML='⚠️ <b>'+esc(channels[currentIdx].name)+'</b> oynatılamadı (format/ ağ hatası)';
+}
+});
+
+searchEl.addEventListener('input',function(){renderList(searchEl.value);});
+
+})();
+</script>
+</body>
+</html>
