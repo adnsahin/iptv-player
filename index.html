@@ -13,13 +13,19 @@ html,body{height:100%;background:#0d1117;color:#e6edf3;font-family:-apple-system
 header{background:#161b22;padding:10px 12px;border-bottom:1px solid #30363d;flex-shrink:0}
 header h1{font-size:16px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 header h1 span{color:#58a6ff}
-.inputrow{display:flex;gap:6px}
+.inputrow{display:flex;gap:6px;margin-bottom:6px}
 .inputrow input[type=text]{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:14px;outline:none}
 .inputrow input[type=text]:focus{border-color:#58a6ff}
 .btn{background:#238636;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
 .btn:active{opacity:.7}
 .btn.gray{background:#21262d;border:1px solid #30363d}
-#status{font-size:12px;color:#8b949e;margin-top:6px}
+.btn.blue{background:#1f6feb}
+#status{font-size:12px;color:#8b949e;margin-top:4px}
+#pastebox{display:none;margin-top:8px}
+#pastebox textarea{width:100%;height:80px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px;font-size:12px;font-family:monospace;resize:vertical}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tab{flex:1;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#8b949e;padding:6px;font-size:12px;text-align:center;cursor:pointer}
+.tab.active{background:#1f6feb;color:#fff;border-color:#1f6feb}
 #playerwrap{display:none;background:#000;position:relative;flex-shrink:0}
 #playerwrap video{width:100%;aspect-ratio:16/9;background:#000;display:block;max-height:45vh}
 #nowplaying{display:none;background:#161b22;padding:6px 12px;font-size:13px;border-bottom:1px solid #30363d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
@@ -36,11 +42,10 @@ header h1 span{color:#58a6ff}
 .ch .info{min-width:0}
 .ch .nm{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ch .grp{font-size:11px;color:#8b949e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#empty{text-align:center;padding:60px 20px;color:#8b949e}
+#empty{text-align:center;padding:40px 20px;color:#8b949e}
 #empty .ic{font-size:48px;margin-bottom:12px}
 #empty p{font-size:13px;line-height:1.6}
 footer{position:fixed;bottom:0;left:0;right:0;background:#161b22;border-top:1px solid #30363d;padding:8px 12px;display:flex;gap:8px;justify-content:center;z-index:10}
-footer a{color:#58a6ff;font-size:12px;text-decoration:none}
 @media(min-width:768px){#playerwrap video{max-height:50vh}}
 </style>
 </head>
@@ -48,15 +53,33 @@ footer a{color:#58a6ff;font-size:12px;text-decoration:none}
 <div id="app">
 <header>
 <h1>📺 <span>IPTV</span> Player</h1>
+<div class="tabs">
+<div class="tab active" data-tab="url">🌐 URL</div>
+<div class="tab" data-tab="paste">📋 Yapıştır</div>
+<div class="tab" data-tab="file">📁 Dosya</div>
+</div>
+<div id="tab-url">
 <div class="inputrow">
 <input type="text" id="m3uurl" placeholder="M3U playlist URL'si..." autocomplete="off">
 <button class="btn" id="loadbtn">Yükle</button>
 </div>
+<div id="status">Otomatik yükleme denenecek...</div>
+</div>
+<div id="tab-paste" style="display:none">
+<div id="pastebox" style="display:block">
+<textarea id="m3utext" placeholder="M3U içeriğini buraya yapıştırın...&#10;&#10;#EXTM3U&#10;#EXTINF:-1 tvg-logo=&quot;...&quot; group-title=&quot;News&quot;,Kanal Adı&#10;http://stream.url/playlist.m3u8"></textarea>
 <div class="inputrow" style="margin-top:6px">
+<button class="btn blue" id="pastebtn" style="flex:1">Yapıştırılanı Yükle</button>
+</div>
+</div>
+</div>
+<div id="tab-file" style="display:none">
+<div class="inputrow">
 <button class="btn gray" id="filebtn" style="flex:1">📁 M3U Dosyası Seç</button>
 <input type="file" id="fileinput" accept=".m3u,.m3u8,text/plain" style="display:none">
 </div>
-<div id="status">Playlist yükleyin veya dosya seçin</div>
+<div style="font-size:12px;color:#8b949e;margin-top:4px">Dosyayı seçtikten sonra otomatik yüklenir</div>
+</div>
 </header>
 <div id="playerwrap">
 <video id="video" controls playsinline webkit-playsinline></video>
@@ -69,12 +92,16 @@ footer a{color:#58a6ff;font-size:12px;text-decoration:none}
 <div id="chlist">
 <div id="empty">
 <div class="ic">📡</div>
-<p>Henüz kanal yok.<br>M3U playlist URL'si yapıştırıp <b>Yükle</b>'ye basın<br>veya cihazınızdan .m3u dosyası seçin.</p>
+<p>Kanal yükleniyor...<br><br>
+<b>3 yöntem:</b><br>
+1. URL sekmesi — sunucumuz otomatik çeker<br>
+2. Yapıştır — M3U metnini kopyala-yapıştır<br>
+3. Dosya — .m3u dosyasını seç</p>
 </div>
 </div>
 </div>
 <footer>
-<span style="font-size:11px;color:#8b949e">iOS 10+ uyumlu • Ana ekrana ekleyebilirsiniz</span>
+<span style="font-size:11px;color:#8b949e">iOS 10+ • Ana ekrana eklenebilir</span>
 </footer>
 
 <script>
@@ -89,65 +116,99 @@ var statusEl=document.getElementById('status');
 var searchEl=document.getElementById('search');
 var chcount=document.getElementById('chcount');
 var m3uurl=document.getElementById('m3uurl');
-
-// son URL'yi hatırla
-try{var saved=localStorage.getItem('iptv_m3u_url');if(saved)m3uurl.value=saved;}catch(e){}
+var m3utext=document.getElementById('m3utext');
 
 function setStatus(t){statusEl.textContent=t;}
 
-document.getElementById('loadbtn').onclick=function(){
-var url=m3uurl.value.replace(/^\s+|\s+$/g,'');
-if(!url){setStatus('URL boş olamaz');return;}
-setStatus('Yükleniyor...');
-try{localStorage.setItem('iptv_m3u_url',url);}catch(e){}
+// Tab switching
+var tabs=document.querySelectorAll('.tab');
+for(var t=0;t<tabs.length;t++){
+tabs[t].onclick=function(){
+var target=this.getAttribute('data-tab');
+for(var k=0;k<tabs.length;k++)tabs[k].classList.remove('active');
+this.classList.add('active');
+document.getElementById('tab-url').style.display=(target==='url')?'block':'none';
+document.getElementById('tab-paste').style.display=(target==='paste')?'block':'none';
+document.getElementById('tab-file').style.display=(target==='file')?'block':'none';
+};
+}
 
-function tryFetch(target, useProxy){
-var finalUrl = useProxy ? buildProxyUrl(target) : target;
-return fetch(finalUrl, {mode:'cors'}).then(function(r){
+// 1) Same-origin channels.json (GitHub Action tarafından güncellenir, CORS yok)
+function loadFromJson(){
+return fetch('channels.json',{cache:'no-cache'}).then(function(r){
+if(!r.ok) throw new Error('HTTP '+r.status);
+return r.json();
+}).then(function(data){
+if(data&&data.length){
+channels=data;
+currentIdx=-1;
+renderList('');
+setStatus(data.length+' kanal yüklendi (sunucu)');
+}
+});
+}
+
+// 2) URL yükleme — proxy fallback'ler
+function loadFromUrl(url){
+function tryFetch(finalUrl){
+return fetch(finalUrl,{mode:'cors'}).then(function(r){
 if(!r.ok) throw new Error('HTTP '+r.status);
 return r.text();
 });
 }
-
-function buildProxyUrl(u){
-return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u);
-}
-
-// Önce proxy üzerinden dene, olmazsa direkt
-tryFetch(url, true)
-.catch(function(){ return tryFetch(url, false); })
-.then(function(t){ parseM3U(t); setStatus(channels.length+' kanal yüklendi'); })
-.catch(function(e){
-// Alternatif proxy'ler dene
-var proxies = [
-'https://api.codetabs.com/v1/proxy?quest=',
-'https://corsproxy.io/?'
+var attempts=[
+'https://api.allorigins.win/raw?url='+encodeURIComponent(url),
+'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url),
+'https://corsproxy.io/?'+encodeURIComponent(url),
+url
 ];
-var i = 0;
+var i=0;
 function next(){
-if(i >= proxies.length){
-setStatus('Yüklenemedi ('+e.message+'). Dosyayı cihazdan seçmeyi deneyin.');
+if(i>=attempts.length){
+setStatus('URL yüklenemedi. Yapıştır veya Dosya yöntemini deneyin.');
 return;
 }
-var p = proxies[i++];
-fetch(p + encodeURIComponent(url), {mode:'cors'})
-.then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
-.then(function(t){ parseM3U(t); setStatus(channels.length+' kanal yüklendi'); })
-.catch(function(){ next(); });
+tryFetch(attempts[i++])
+.then(function(text){
+if(text.indexOf('EXTINF')===-1) throw new Error('M3U formatı değil');
+parseM3U(text);
+setStatus(channels.length+' kanal yüklendi (URL)');
+})
+.catch(function(){next();});
 }
 next();
-});
+}
+
+// 3) Yapıştırma
+document.getElementById('pastebtn').onclick=function(){
+var text=m3utext.value;
+if(!text||text.indexOf('EXTINF')===-1){
+alert('Geçerli bir M3U metni değil. #EXTINF satırları içermeli.');
+return;
+}
+parseM3U(text);
+setStatus(channels.length+' kanal yüklendi (yapıştırma)');
 };
 
+// 4) Dosya seçme
 document.getElementById('filebtn').onclick=function(){document.getElementById('fileinput').click();};
 document.getElementById('fileinput').onchange=function(e){
 var f=e.target.files[0];if(!f)return;
-setStatus('Dosya okunuyor...');
 var r=new FileReader();
 r.onload=function(){parseM3U(r.result);setStatus(channels.length+' kanal yüklendi (dosya)');};
 r.readAsText(f);
 };
 
+// URL yükleme butonu
+document.getElementById('loadbtn').onclick=function(){
+var url=m3uurl.value.replace(/^\s+|\s+$/g,'');
+if(!url){setStatus('URL boş olamaz');return;}
+setStatus('URL yükleniyor...');
+try{localStorage.setItem('iptv_m3u_url',url);}catch(e){}
+loadFromUrl(url);
+};
+
+// M3U parse
 function parseM3U(text){
 channels=[];
 currentIdx=-1;
@@ -166,7 +227,7 @@ var dp=line.lastIndexOf(',');
 if(dp>-1)name=line.substring(dp+1).replace(/^\s+|\s+$/g,'');
 pending={name:name||'Kanal',logo:logo,group:group||'Diğer',url:''};
 }else if(line.indexOf('#')===0){
-// yorum satırı, atla
+// skip
 }else if(pending){
 pending.url=line;
 channels.push(pending);
@@ -176,12 +237,13 @@ pending=null;
 renderList('');
 }
 
+// Liste render
 function renderList(q){
 chlist.innerHTML='';
 chcount.textContent=channels.length?channels.length+' kanal':'';
 if(!channels.length){
 chcount.textContent='';
-chlist.innerHTML='<div id="empty"><div class="ic">📡</div><p>Henüz kanal yok.<br>M3U playlist URL\'si yapıştırıp <b>Yükle</b>\'ye basın<br>veya cihazınızdan .m3u dosyası seçin.</p></div>';
+chlist.innerHTML='<div id="empty"><div class="ic">📡</div><p>Kanal yok.<br>Yukarıdan yöntem seçin.</p></div>';
 return;
 }
 q=(q||'').toLowerCase();
@@ -227,24 +289,38 @@ currentIdx=idx;
 var c=channels[idx];
 playerwrap.style.display='block';
 nowplaying.style.display='block';
-nowplaying.innerHTML='Şu an oynatılıyor: <b>'+esc(c.name)+'</b> — '+esc(c.group);
+nowplaying.innerHTML='▶ <b>'+esc(c.name)+'</b> — '+esc(c.group);
 video.src=c.url;
 video.load();
 var p=video.play();
 if(p&&p.catch)p.catch(function(){});
-// listeyi işaretle
-var els=chlist.getElementsByClassName('ch');
-for(var i=0;i<els.length;i++)els[i].classList.remove('playing');
-renderList(searchEl.value); // yeniden render ile işaretle
+renderList(searchEl.value);
 }
 
 video.addEventListener('error',function(){
 if(currentIdx>=0&&channels[currentIdx]){
-nowplaying.innerHTML='⚠️ <b>'+esc(channels[currentIdx].name)+'</b> oynatılamadı (format/ ağ hatası)';
+nowplaying.innerHTML='⚠️ <b>'+esc(channels[currentIdx].name)+'</b> oynatılamadı';
 }
 });
 
 searchEl.addEventListener('input',function(){renderList(searchEl.value);});
+
+// Son URL'yi hatırlat
+try{var saved=localStorage.getItem('iptv_m3u_url');if(saved)m3uurl.value=saved;}catch(e){}
+
+// Başlangıç: önce same-origin JSON dene
+setStatus('Sunucu playlist kontrol ediliyor...');
+loadFromJson().catch(function(){
+// JSON yoksa ve kayıtlı URL varsa onu dene
+var saved=null;
+try{saved=localStorage.getItem('iptv_m3u_url');}catch(e){}
+if(saved){
+m3uurl.value=saved;
+loadFromUrl(saved);
+}else{
+setStatus('Playlist yok. URL, Yapıştır veya Dosya ile yükleyin.');
+}
+});
 
 })();
 </script>

@@ -1,0 +1,75 @@
+name: Fetch M3U Playlist
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'm3u_url.txt'
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read M3U URL
+        id: m3u
+        run: |
+          URL=$(cat m3u_url.txt | tr -d '[:space:]')
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "M3U URL: $URL"
+
+      - name: Fetch and convert M3U
+        if: steps.m3u.outputs.url != ''
+        run: |
+          curl -sL -A "Mozilla/5.0" "${{ steps.m3u.outputs.url }}" -o playlist.m3u || true
+          if [ ! -s playlist.m3u ]; then
+            echo "[] > channels.json"
+            exit 0
+          fi
+          python3 << 'EOF'
+          import json, re
+
+          channels = []
+          pending = None
+
+          with open('playlist.m3u', 'r', encoding='utf-8', errors='ignore') as f:
+              for line in f:
+                  line = line.strip()
+                  if not line:
+                      continue
+                  if line.startswith('#EXTINF'):
+                      logo = ''
+                      group = 'Diğer'
+                      m = re.search(r'tvg-logo="([^"]*)"', line, re.I)
+                      if m:
+                          logo = m.group(1)
+                      m = re.search(r'group-title="([^"]*)"', line, re.I)
+                      if m:
+                          group = m.group(1)
+                      dp = line.rfind(',')
+                      name = line[dp+1:].strip() if dp > -1 else 'Kanal'
+                      pending = {'name': name or 'Kanal', 'logo': logo, 'group': group, 'url': ''}
+                  elif line.startswith('#'):
+                      continue
+                  elif pending is not None:
+                      pending['url'] = line
+                      channels.append(pending)
+                      pending = None
+
+          with open('channels.json', 'w', encoding='utf-8') as f:
+              json.dump(channels, f, ensure_ascii=False)
+          print(f"Converted {len(channels)} channels")
+          EOF
+
+      - name: Commit channels.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add channels.json
+          git diff --cached --quiet || git commit -m "Update channels.json"
+          git push
