@@ -100,11 +100,42 @@ var url=m3uurl.value.replace(/^\s+|\s+$/g,'');
 if(!url){setStatus('URL boş olamaz');return;}
 setStatus('Yükleniyor...');
 try{localStorage.setItem('iptv_m3u_url',url);}catch(e){}
-fetch(url,{mode:'cors'})
-.then(function(r){if(!r.ok)throw new Error(r.status);return r.text();})
-.then(function(t){parseM3U(t);setStatus(channels.length+' kanal yüklendi');})
+
+function tryFetch(target, useProxy){
+var finalUrl = useProxy ? buildProxyUrl(target) : target;
+return fetch(finalUrl, {mode:'cors'}).then(function(r){
+if(!r.ok) throw new Error('HTTP '+r.status);
+return r.text();
+});
+}
+
+function buildProxyUrl(u){
+return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u);
+}
+
+// Önce proxy üzerinden dene, olmazsa direkt
+tryFetch(url, true)
+.catch(function(){ return tryFetch(url, false); })
+.then(function(t){ parseM3U(t); setStatus(channels.length+' kanal yüklendi'); })
 .catch(function(e){
-setStatus('CORS/ Ağ hatası: '+e.message+' — dosyayı cihazdan seçin veya farklı bir URL deneyin');
+// Alternatif proxy'ler dene
+var proxies = [
+'https://api.codetabs.com/v1/proxy?quest=',
+'https://corsproxy.io/?'
+];
+var i = 0;
+function next(){
+if(i >= proxies.length){
+setStatus('Yüklenemedi ('+e.message+'). Dosyayı cihazdan seçmeyi deneyin.');
+return;
+}
+var p = proxies[i++];
+fetch(p + encodeURIComponent(url), {mode:'cors'})
+.then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+.then(function(t){ parseM3U(t); setStatus(channels.length+' kanal yüklendi'); })
+.catch(function(){ next(); });
+}
+next();
 });
 };
 
